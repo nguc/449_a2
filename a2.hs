@@ -11,8 +11,35 @@ import Numeric (showHex)
 --
 -- Define your algebraic types for Part 1 here
 --
-data QuadTree = Leaf (Int, Int, Int) | InnerNode QuadTree QuadTree QuadTree QuadTree
-data QuadTreeImage = NoImg | QuadTreeImage Int QuadTree
+-- // ===================== Part 1 ==================== //
+--
+-- Quad Tree Data Type
+-- Leaf (Int, Int, Int) = (Red, Blue, Green)
+-- Node (QuadTree, Quadtree, QuadTree, QuadTree) = (TL, TR, BL, BR)
+data QuadTree = Leaf Int Int Int | Node QuadTree QuadTree QuadTree QuadTree | NilT
+
+-- QuadTreeImage Data Type
+-- SquareImg (Int, QuadTree) = (width, QuadTree)
+data Image = SquareImg Int QuadTree
+
+-- Leaf constructor for QuadTree
+newLeaf :: (Int, Int, Int) -> QuadTree
+newLeaf (r,g,b)
+  | r < 0 || g < 0 || b < 0 || r > 255 || g > 255 || b > 255 = 
+        error "Invalid values. Values must be between 0 and 255"
+  | otherwise = (Leaf r g b)
+
+instance Show QuadTree where
+  show (Leaf r g b) = "Leaf: (" ++ (show r) ++ ", " ++ (show g) ++ ", " ++ (show b) ++ ") "
+  show (Node a b c d) = "Node: [ " ++ (show a) ++ (show b) ++ (show c) ++ (show d) ++ "] "
+  show NilT = "[ ]"
+
+instance Show Image where
+  show (SquareImg w qt) = "QuadTree Image (Width = " ++ (show w) ++ "): " ++ (show qt)
+
+-- // ===================================================== //
+
+
 --
 -- The following functions are a simple PNG file loader.  Note that these
 -- functions will not load all PNG files.  They makes some assumptions about
@@ -98,21 +125,102 @@ decodeImage bytes
 --
 -- Insert your code here for Parts 2, 3 and 4 here
 --
--- Part 2 code
-createTree :: [[(Int, Int, Int)]] -> QuadTreeImage
+-- 
+-- // ===================== Part 2 ==================== //
+
+-- Creates a quad tree image from a 2D list of tuples
+createTree :: [[(Int, Int, Int)]] -> Image
 createTree list
-  | isImgSquare list == False = error "The image is not square" 
-  | checkColour
-  | otherwise = NoImg
+  | (isSquare list) = SquareImg (length list) (makeQuadTree list)
+  | otherwise = error "The image is not a square"
 
-isImgSquare :: [[(Int, Int, Int)]] -> Bool
-isImgSquare list = all (\x -> length x == length list) list
 
-checkColour :: (Int, Int, Int) -> (Int, Int, Int) -> Bool
-checkColour (r1, g1, b1) (r2, g2, b2)
-  | r1 == r2 && g1 == g2 && b1 == b2 = True
+-- returns true if the 2D list is a square
+isSquare :: [[a]] -> Bool
+isSquare [] = True
+isSquare list
+  | (length list) == (length (head list)) = True
   | otherwise = False
 
+-- creates a quad tree from a 2D list representation of an image
+makeQuadTree :: [[(Int, Int, Int)]] -> QuadTree
+makeQuadTree [[]] = NilT
+makeQuadTree [] = NilT
+makeQuadTree arr
+  | samePixels arr = newLeaf (head (head arr))
+  | otherwise  = Node (makeQuadTree (quarterArray arr 1)) 
+                      (makeQuadTree (quarterArray arr 2)) 
+                      (makeQuadTree (quarterArray arr 3)) 
+                      (makeQuadTree (quarterArray arr 4))
+
+
+samePixels :: [[(Int, Int, Int)]] -> Bool
+samePixes [] = True
+samePixels [x] = isAllSame x
+samePixels (x:xs)
+   | isAllSame x && x == (head xs) = samePixels xs
+   | otherwise = False
+
+
+-- returns true if all values in the list are the same
+isAllSame :: Eq a => [a] -> Bool
+isAllSame [] = True
+isAllSame [x] = True
+isAllSame (x:xs)
+  | x == (head xs) = (isAllSame xs)
+  | otherwise = False
+
+
+-- Takes a 2D list and returns a quarter of the list. 
+-- The Int input should be either 1, 2, 3, or 4, 
+-- where  1: Top left, 2: Top Right, 3: Bottom Left, 4: Bottmo Right
+quarterArray :: [[a]] -> Int -> [[a]]
+quarterArray arr i
+  | i == 1 = frontHalfList (frontHalfArray arr)
+  | i == 2 = frontHalfList (backHalfArray arr)
+  | i == 3 = backHalfList (frontHalfArray arr)
+  | i == 4 = backHalfList (backHalfArray arr)
+  | otherwise = error "quarterArray takes an input of [[a]]"
+
+-- Function that takes a list of lists, and halves each list, returning the front half.
+frontHalfArray :: [[a]] -> [[a]]
+frontHalfArray [] = []
+frontHalfArray (x:xs) = (frontHalfList x):(frontHalfArray xs)
+--
+
+-- Function which takes a list of lists, and halves each list, returning the back half.
+backHalfArray :: [[a]] -> [[a]]
+backHalfArray [] = []
+backHalfArray (x:xs) = (backHalfList x):(backHalfArray xs)
+--
+
+-- Function which takes a list, and returns the front half of it.
+frontHalfList :: [a] -> [a]
+fronttHalfList [] = []
+frontHalfList xs
+   | (length xs) `rem` 2 == 0 = take ((length xs) `div` 2) xs
+   | otherwise = take ((length xs)`div` 2 + 1) xs
+--
+
+-- Function which takes a list, and returns the back half of it.
+backHalfList :: [a] -> [a]
+backHalfList [] = []
+backHalfList xs
+   | (length xs) `rem` 2 == 0 = drop ((length xs) `div` 2) xs
+   | otherwise = drop ((length xs) `div` 2 +1) xs   
+--
+
+
+-- // ================================================= //
+
+
+-- // ===================== Part 3 ==================== //
+
+-- // ================================================= //
+
+-- // ===================== Part 4 ==================== //
+
+-- // ================================================= //
 --
 -- Load a PNG file, convert it to a quad tree, mirror it, grayscale it,
 -- and write all three images to an .html file.
@@ -121,7 +229,7 @@ main :: IO ()
 main = do
   -- Change the name inside double quotes to load a different file
   -- input <- BS.readFile "Mondrian.png"
-  input <- BS.readFile "notsq.png"
+  input <- BS.readFile "Mondrian.png"
  
   -- image is the list representation of the image stored in the .png file
   let image = decodeImage input
